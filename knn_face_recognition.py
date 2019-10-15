@@ -46,8 +46,10 @@ import os
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'JPG'}
 process_this_frame = True
 
+
 def image_files_in_folder(folder):
     return [os.path.join(folder, f) for f in os.listdir(folder) if re.match(r'.*\.(jpg|jpeg|png|JPG)', f, flags=re.I)]
+
 
 def train(save_queue, progress_queue, train_dir, model_save_path=None, n_neighbors=None, knn_algo='ball_tree', verbose=False):
     """
@@ -74,20 +76,24 @@ def train(save_queue, progress_queue, train_dir, model_save_path=None, n_neighbo
     :param verbose: verbosity of training
     :return: returns knn classifier that was trained on the given data.
     """
+    # train 함수를 process로 만들어 무한반복
     while True:
+        # save_queue에 무언가가 들어오면 시작
         signal = save_queue.get()
-        #print(signal)
 
         X = []
         y = []
 
         cnt = 0
+
+        # train_dir의 사진수 카운트
         for class_dir in os.listdir(train_dir):
             if not os.path.isdir(os.path.join(train_dir, class_dir)):
                 continue
             # Loop through each training image for the current person
             for img_path in image_files_in_folder(os.path.join(train_dir, class_dir)):
                 cnt += 1
+
         value=0
 
         # Loop through each person in the training set
@@ -97,11 +103,11 @@ def train(save_queue, progress_queue, train_dir, model_save_path=None, n_neighbo
 
             # Loop through each training image for the current person
             for img_path in image_files_in_folder(os.path.join(train_dir, class_dir)):
-                #print(img_path)
+                # 진행 퍼센트 계산해서 값을 progress_queue에 put
                 value+=(1/cnt)*100
-                # print(value)
-                #progress.setProperty("value", value)
                 progress_queue.put(value)
+
+                # 이미지를 불러와서 얼굴을 검출하고 좌표를 list로 return
                 image = face_recognition.load_image_file(img_path)
                 face_bounding_boxes = face_recognition.face_locations(image)
 
@@ -113,6 +119,7 @@ def train(save_queue, progress_queue, train_dir, model_save_path=None, n_neighbo
                     # Add face encoding for current image to the training set
                     X.append(face_recognition.face_encodings(image, known_face_locations=face_bounding_boxes)[0])
                     y.append(class_dir)
+
 
         # Determine how many neighbors to use for weighting in the KNN classifier
         if n_neighbors is None:
@@ -129,8 +136,9 @@ def train(save_queue, progress_queue, train_dir, model_save_path=None, n_neighbo
             with open(model_save_path, 'wb') as f:
                 pickle.dump(knn_clf, f)
 
+
+        # train 함수가 완료되었음을 알려줌
         progress_queue.put(10000)
-        #return knn_clf
 
 
 def predict(rgb_small_frame, knn_clf=None, model_path=None, distance_threshold=0.45):
@@ -170,80 +178,3 @@ def predict(rgb_small_frame, knn_clf=None, model_path=None, distance_threshold=0
 
     # Predict classes and remove classifications that aren't within the threshold
     return [(pred, loc) if rec else ("unknown", loc) for pred, loc, rec in zip(knn_clf.predict(faces_encodings), X_face_locations, are_matches)]
-
-
-def show_prediction_labels_on_image(frame, predictions):
-    """
-    Shows the face recognition results visually.
-
-    :param frame
-    :param predictions: results of the predict function
-    :return:
-    """
-
-    for name, (top, right, bottom, left) in predictions:
-        # Scale back up face locations since the frame we detected in was scaled to 1/4 size
-        top *= 4
-        right *= 4
-        bottom *= 4
-        left *= 4
-
-        # Draw a box around the face
-        cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
-
-        # Draw a label with a name below the face
-        cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
-        font = cv2.FONT_HERSHEY_DUPLEX
-        cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
-
-    # Display the resulting image
-    cv2.imshow('Video', frame)
-
-
-
-if __name__ == "__main__":
-    # STEP 1: Train the KNN classifier and save it to disk
-    # Once the model is trained and saved, you can skip this step next time.
-    print("Training KNN classifier...")
-    classifier = train("knn_examples/train", model_save_path="trained_knn_model.clf", n_neighbors=2)
-    print("Training complete!")
-
-    video_capture = cv2.VideoCapture(-1)
-
-    while True:
-        # Grab a single frame of video
-        ret, frame = video_capture.read()
-
-        # Resize frame of video to 1/4 size for faster face recognition processing
-        # small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-        try:
-            small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-            rgb_small_frame = small_frame[:, :, ::-1]
-        except Exception as e:
-            print(str(e))
-
-        # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-        # rgb_small_frame = small_frame[:, :, ::-1]
-
-        # Only process every other frame of video to save time
-        if process_this_frame:
-            # Find all the faces and face encodings in the current frame of video using a trained classifier model
-            # Note: You can pass in either a classifier file name or a classifier model instance
-            predictions = predict(rgb_small_frame, model_path="trained_knn_model.clf")
-
-            # Display results overlaid on an image
-            show_prediction_labels_on_image(frame, predictions)
-
-        process_this_frame = not process_this_frame
-
-        # Display the resulting image
-        cv2.imshow('Video', frame)
-
-        # Hit 'q' on the keyboard to quit!
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    # Release handle to the webcam
-    video_capture.release()
-    cv2.destroyAllWindows()
-
