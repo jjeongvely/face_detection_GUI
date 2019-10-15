@@ -27,6 +27,7 @@ class MainWindow(QWidget, form_class):
         self.setupUi(self)
 
         self.edit.setText("Input name")
+        self.data_dir="/home/qisens/facedetection/dataset/"
 
         # create a timer
         # set timer timeout callback function
@@ -60,7 +61,7 @@ class MainWindow(QWidget, form_class):
         self.progress_queue = Queue()
 
         # 얼굴 등록시 화면에서 계속 영상이 나오도록 등록 process를 따로 만들어줌
-        self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue, "dataset", "trained_knn_model.clf", 2))
+        self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue, self.data_dir, "trained_knn_model.clf", 2))
         self.save_process.start()
 
 
@@ -75,10 +76,8 @@ class MainWindow(QWidget, form_class):
 
     # 등록한 사람들의 이름 리스트를 보여줌
     def list(self):
-        # 등록한 사람들의 data가 저장된 폴더
-        dir = "/home/qisens/facedetection/dataset/"
         msg = ""
-        for class_dir in os.listdir(dir):
+        for class_dir in os.listdir(self.data_dir):
             msg += str(class_dir + '\n')
             self.namelist.setText(msg)
 
@@ -155,7 +154,7 @@ class MainWindow(QWidget, form_class):
     def saveName(self):
         self.log_browser.setText("이름을 입력하세요")
         self.progressBar.setProperty("value", 0)
-        success = True
+        success = False
         if self.save_bt.isDown() is True:
             self.log_browser.setText("잠시만 기다리세요")
             name = self.edit.text()
@@ -174,12 +173,12 @@ class MainWindow(QWidget, form_class):
                     success = False
                     break
 
+                success = True
                 image_name = "{:%Y%m%dT%H%M%S}_{}.jpg".format(datetime.datetime.now(), i)
-                folder_name = "/home/qisens/facedetection/dataset/"
 
-                if not os.path.isdir(folder_name + name):
-                    os.mkdir(folder_name + name)
-                image.save(folder_name + name + '/' + image_name)
+                if not os.path.isdir(self.data_dir + name):
+                    os.mkdir(self.data_dir + name)
+                image.save(self.data_dir + name + '/' + image_name)
 
         # 등록에 성공한 경우에만 progress_timer start
         if success:
