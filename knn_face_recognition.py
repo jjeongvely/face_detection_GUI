@@ -35,8 +35,8 @@ import math
 from sklearn import neighbors
 import os.path
 import pickle
-from face_recognition.face_recognition_cli import image_files_in_folder
 
+import re
 import face_recognition
 import cv2
 
@@ -46,6 +46,8 @@ import os
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'JPG'}
 process_this_frame = True
 
+def image_files_in_folder(folder):
+    return [os.path.join(folder, f) for f in os.listdir(folder) if re.match(r'.*\.(jpg|jpeg|png|JPG)', f, flags=re.I)]
 
 def train(save_queue, progress_queue, train_dir, model_save_path=None, n_neighbors=None, knn_algo='ball_tree', verbose=False):
     """
