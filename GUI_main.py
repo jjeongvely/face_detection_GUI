@@ -30,33 +30,41 @@ class MainWindow(QWidget, form_class):
 
         # create a timer
         # set timer timeout callback function
-        self.view_timer = QTimer() # viewCam함수 즉, 화면 출력을 위한 timer
+
+        # viewCam함수 즉, 화면 출력을 위한 timer
+        self.view_timer = QTimer()
         self.view_timer.timeout.connect(self.viewCam)
 
         self.detect_timer = QTimer()
         self.detect_timer.timeout.connect(self.Detection)
 
-        self.save_timer = QTimer() # save 버튼을 누르는지 보기위한 timer
+        # save 버튼을 누르는지 보기위한 timer
+        self.save_timer = QTimer()
         self.save_timer.timeout.connect(self.saveName)
 
-        self.progress_timer = QTimer() # progressBar에 숫자를 표시해주기위한 timer
+        # progressBar에 숫자를 표시해주기위한 timer
+        self.progress_timer = QTimer()
         self.progress_timer.timeout.connect(self.progress)
 
         self.controlTimer()
         self.list()
 
         # set detection callback clicked  function
+        # face registration 버튼을 누르면 faceRegistration 함수 호출
         self.registration.clicked.connect(self.faceRegistration)
-        self.detection.clicked.connect(self.faceDetection) # detection 버튼을 누르면 faceDetection 함수 호출
+        # detection 버튼을 누르면 faceDetection 함수 호출
+        self.detection.clicked.connect(self.faceDetection)
 
         # Setup process and queues for multiprocessing.
         self.save_queue = Queue()
         self.progress_queue = Queue()
 
+        # 얼굴 등록시 화면에서 계속 영상이 나오도록 등록 process를 따로 만들어줌
         self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue, "dataset", "trained_knn_model.clf", 2))
         self.save_process.start()
 
 
+    # progress bar에 표시해줄 숫자를 받아옴
     def progress(self):
         num = self.progress_queue.get()
         if num == 10000:
@@ -65,7 +73,9 @@ class MainWindow(QWidget, form_class):
         self.progressBar.setProperty("value", num)
 
 
+    # 등록한 사람들의 이름 리스트를 보여줌
     def list(self):
+        # 등록한 사람들의 data가 저장된 폴더
         dir = "/home/qisens/facedetection/dataset/"
         msg = ""
         for class_dir in os.listdir(dir):
@@ -125,7 +135,6 @@ class MainWindow(QWidget, form_class):
             cv2.rectangle(frame, (left, bottom - 35), (right, bottom), (0, 0, 255), cv2.FILLED)
             font = cv2.FONT_HERSHEY_DUPLEX
             cv2.putText(frame, name, (left + 6, bottom - 6), font, 1.0, (255, 255, 255), 1)
-            # print(name)
 
         # cv2에서는 BGR이므로 RGB로 바꿈
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -133,46 +142,54 @@ class MainWindow(QWidget, form_class):
         # get image infos
         height, width, channel = frame.shape
         step = channel * width
+
         # create QImage from image
         qImg = QImage(frame, width, height, step, QImage.Format_RGB888)
 
         # show image in img_label
-        self.image_label.setPixmap(QPixmap.fromImage(qImg))
+        self.image_label.setPixmap(QPixmap(qImg))
         self.detect_timer.start(0.1)
 
 
+    # 이름을 쓰고 save버튼을 누를때까지 timer작동
     def saveName(self):
         self.log_browser.setText("이름을 입력하세요")
         self.progressBar.setProperty("value", 0)
-        fail = False
+        success = True
         if self.save_bt.isDown() is True:
+            self.log_browser.setText("잠시만 기다리세요")
             name = self.edit.text()
             self.save_timer.stop()
+            # print(name)
             for i in range(10):
                 ret, frame = self.cap.read()
                 frame = cv2.flip(frame, 2)
                 image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 image = Image.fromarray(image)
                 bounding_boxes = face_recognition.face_locations(frame)
+
+                # 등록시 화면에 한명이 아닌경우
                 if len(bounding_boxes) != 1:
                     self.log_browser.setText("등록실패! 한명만 시도하십시오")
-                    fail = False
+                    success = False
                     break
+
                 image_name = "{:%Y%m%dT%H%M%S}_{}.jpg".format(datetime.datetime.now(), i)
                 folder_name = "/home/qisens/facedetection/dataset/"
+
                 if not os.path.isdir(folder_name + name):
-                    print("mkdir")
                     os.mkdir(folder_name + name)
                 image.save(folder_name + name + '/' + image_name)
-            fail = True
-        if fail:
-            self.log_browser.setText("잠시만 기다리세요")
-            print("잠시만 기다리세요")
+
+        # 등록에 성공한 경우에만 progress_timer start
+        if success:
             self.progress_timer.start(0.1)
+            # save_queue에 무언가를 넣어줌으로써 train함수 작동
             self.save_queue.put(1)
             self.list()
 
 
+    # save_timer를 작동시킴
     def faceRegistration(self):
         self.save_timer.start(0.1)
         self.log_browser.setText("Start face registration")
