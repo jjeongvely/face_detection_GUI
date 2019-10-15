@@ -12,6 +12,7 @@ from PyQt5.QtCore import QTimer
 from PyQt5 import uic
 
 import cv2
+import os
 
 print("OpenCV version: {}".format(cv2.__version__))
 
@@ -28,6 +29,7 @@ class MainWindow(QWidget, form_class):
 
         self.edit.setText("Input name")
         self.data_dir="/home/qisens/facedetection/dataset/"
+        self.model_path="/home/qisens/facedetection/dataset/trained_knn_model.clf"
 
         # create a timer
         # set timer timeout callback function
@@ -61,7 +63,7 @@ class MainWindow(QWidget, form_class):
         self.progress_queue = Queue()
 
         # 얼굴 등록시 화면에서 계속 영상이 나오도록 등록 process를 따로 만들어줌
-        self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue, self.data_dir, "trained_knn_model.clf", 2))
+        self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue, self.data_dir, self.model_path, 2))
         self.save_process.start()
 
 
@@ -78,16 +80,20 @@ class MainWindow(QWidget, form_class):
     def list(self):
         msg = ""
         for class_dir in os.listdir(self.data_dir):
-            msg += str(class_dir + '\n')
-            self.namelist.setText(msg)
+            if os.path.isdir(self.data_dir+class_dir):
+                msg += str(class_dir + '\n')
+        self.namelist.setText(msg)
 
 
     def faceDetection(self):
         # detect_timer가 stop상태이면 start시켜 detection 함수 호출
         if not self.detect_timer.isActive():
-            self.log_browser.setText("[INFO] Start face detection")
-            self.detect_timer.start(0.1)
-            self.detection.setText("Stop")
+            if os.path.isfile(self.model_path)==False:
+                self.log_browser.setText("model이 존재하지 않습니다. 등록하세요")
+            else:
+                self.log_browser.setText("[INFO] Start face detection")
+                self.detect_timer.start(0.1)
+                self.detection.setText("Stop")
         # detection 버튼을 다시 누르면 detect_timer가 start상태이므로 stop으로 변경
         else:
             self.detect_timer.stop()
@@ -116,7 +122,7 @@ class MainWindow(QWidget, form_class):
 
         # Find all the faces and face encodings in the current frame of video using a trained classifier model
         # Note: You can pass in either a classifier file name or a classifier model instance
-        predictions = predict(rgb_small_frame, model_path="trained_knn_model.clf")
+        predictions = predict(rgb_small_frame, model_path=self.model_path)
 
         # 화면의 사람을 예측하여 얼굴에 bounding box로 표시
         # Display results overlaid on an image
