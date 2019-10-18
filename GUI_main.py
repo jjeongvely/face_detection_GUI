@@ -28,8 +28,8 @@ class MainWindow(QWidget, form_class):
         self.setupUi(self)
 
         self.edit.setText("Input name")
-        self.data_dir="/home/qisens/facedetection/dataset/"
-        self.model_path="/home/qisens/facedetection/dataset/trained_knn_model.clf"
+        self.data_dir="dataset/"
+        self.model_path="dataset/trained_knn_model.clf"
 
         # create a timer
         # set timer timeout callback function
