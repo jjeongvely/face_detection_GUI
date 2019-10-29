@@ -63,8 +63,7 @@ class MainWindow(QWidget, form_class):
         self.progress_queue = Queue()
 
         # 얼굴 등록시 화면에서 계속 영상이 나오도록 등록 process를 따로 만들어줌
-        self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue,
-                                                       self.data_dir, self.model_path, 2))
+        self.save_process = Process(target=train, args=(self.save_queue, self.progress_queue, self.data_dir, self.model_path, 2))
         self.save_process.start()
 
 
